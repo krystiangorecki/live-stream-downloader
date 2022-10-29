@@ -14,7 +14,7 @@ const open = async (tab, extra = []) => {
   }, prefs => {
     const args = new URLSearchParams();
     args.set('tabId', tab.id);
-    args.set('title', tab.title || '');
+    args.set('title', tab.title.replace(/^Watch /i, '') || '');
     args.set('href', tab.url || '');
     for (const {key, value} of extra) {
       args.set(key, value);

@@ -437,6 +437,13 @@ const options = div => {
       (div.meta.gname || div.meta.name || 'Untitled') +
       (div.meta.index ? (' - ' + div.meta.index) : '') +
       '.mkv';
+
+    // not needed anymore as I managed to set proper name earlier in meta object
+    if (window.page.innerText.indexOf('sbembed.com')!=-1) {
+        debugger;
+       // options.suggestedName = window.title.innerText;
+    }
+
   }
   else if (div.meta.ext) {
     if (div.meta.mime) {
