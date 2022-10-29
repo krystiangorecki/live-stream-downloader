@@ -244,8 +244,8 @@ Press "Retry" to try one more time`);
     if (stat.total === 1) {
       if (n.sizes.has(0)) {
         const percent = stat.fetched / n.sizes.get(0) * 100;
-        document.title = percent.toFixed(1) + `% fetched [${MyGet.size(stat.fetched)}/${MyGet.size(n.sizes.get(0))}]` +
-          ` [Threads: ${n.actives}]`;
+        document.title = percent.toFixed(1) + `% ${MyGet.size(stat.fetched)}/${MyGet.size(n.sizes.get(0))}` +
+          ` [T: ${n.actives}] ${window.title.innerText}`;
 
         progress.value = stat.fetched;
         progress.max = n.sizes.get(0);
@@ -255,8 +255,9 @@ Press "Retry" to try one more time`);
       }
     }
     else {
+      var estimatedSize = MyGet.size(stat.fetched/(stat.current/stat.total));
       document.title = (stat.current / stat.total * 100).toFixed(1) +
-        `% fetched [${stat.current}/${stat.total}] (${MyGet.size(stat.fetched)})` + ` [Threads: ${n.actives}]`;
+       `% ` + /*[${stat.current}/${stat.total}]`+ */ `${MyGet.size(stat.fetched)}/~${estimatedSize}` + ` [T: ${n.actives}]  ${window.title.innerText}`;
 
       progress.value = stat.current;
       progress.max = stat.total;
@@ -274,7 +275,7 @@ Press "Retry" to try one more time`);
     await n.fetch(segments);
     clearInterval(timer);
 
-    document.title = 'Done. Media is ready!';
+    document.title = `Done! ${window.title.innerText}`;
 
     // try to rename
     if (n.meta.name && n.meta.ext && file.move) {

@@ -86,6 +86,7 @@ class SGet extends MyGet {
     }
   }
   static size(bytes, si = false, dp = 1) {
+    si = true;
     bytes = Number(bytes);
     const thresh = si ? 1000 : 1024;
 
