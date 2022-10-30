@@ -1,7 +1,7 @@
 :root {
   --bg-light-dark: rgba(0, 0, 0, 0.05);
   --bg-dark: #4d5155;
-  --bg-light: #fff;
+  --bg-light: #002e0a;
   --bg-progress: #0074cc;
 }
 
@@ -17,7 +17,7 @@ body {
   accent-color: var(--bg-dark);
 }
 body[data-mode=error] {
-  background-color: #ffdcdc;
+  background-color: #420303;
 }
 body::before {
   position: fixed;
@@ -32,7 +32,7 @@ body::before {
 }
 
 body[data-mode=done] {
-  background-color: #f1ffed;
+  background-color: #000000;
 }
 body[data-mode=download]::before {
   content: 'Download is in progress. Do not close this window...';
