@@ -513,3 +513,9 @@ document.getElementById('hrefs').onsubmit = async e => {
 
   div.dataset.active = false;
 };
+
+window.addEventListener('keydown', e => {
+  if(e.code === 'Escape') {
+    window.close();
+  }
+});
