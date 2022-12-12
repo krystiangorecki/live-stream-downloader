@@ -152,6 +152,9 @@ const build = async os => {
   }
 
   document.body.dataset.mode = document.querySelector('form .entry') ? 'ready' : 'empty';
+
+  //autofocus on the first button
+  document.querySelector('#hrefs input[type=submit]').focus();
 };
 
 chrome.runtime.sendMessage({
@@ -256,8 +259,8 @@ Press "Retry" to try one more time`);
     }
     else {
       var estimatedSize = MyGet.size(stat.fetched/(stat.current/stat.total));
-      document.title = (stat.current / stat.total * 100).toFixed(1) +
-       `% ` + /*[${stat.current}/${stat.total}]`+ */ `${MyGet.size(stat.fetched)}/~${estimatedSize}` + ` [T: ${n.actives}]  ${window.title.innerText}`;
+      document.title = (stat.current / stat.total * 100).toFixed(0) +
+       `%` + /*[${stat.current}/${stat.total}] ${MyGet.size(stat.fetched)}/ */ `~${estimatedSize} ${window.title.innerText}  [T: ${n.actives}] `;
 
       progress.value = stat.current;
       progress.max = stat.total;
@@ -275,7 +278,7 @@ Press "Retry" to try one more time`);
     await n.fetch(segments);
     clearInterval(timer);
 
-    document.title = `Done! ${window.title.innerText}`;
+    document.title = `Done ${MyGet.size(stat.fetched)} ${window.title.innerText} `;
 
     // try to rename
     if (n.meta.name && n.meta.ext && file.move) {
@@ -441,7 +444,6 @@ const options = div => {
 
     // not needed anymore as I managed to set proper name earlier in meta object
     if (window.page.innerText.indexOf('sbembed.com')!=-1) {
-        debugger;
        // options.suggestedName = window.title.innerText;
     }
 

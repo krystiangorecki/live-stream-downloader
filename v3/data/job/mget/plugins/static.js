@@ -77,7 +77,7 @@ class SGet extends MyGet {
 
       // this one requires Tampermonkey script to set filename as title:
       // document.title = document.querySelector('h2>span').textContent;
-      if (window.page.innerText.indexOf('sbembed.com')!=-1) {
+      if (window.page.innerText.includes('sbembed.com') || window.page.innerText.includes('streamhub.to') ) {
         meta.name = window.title.innerText;
       }
 
@@ -95,7 +95,7 @@ class SGet extends MyGet {
     }
 
     const units = si ?
-      ['kB', 'MB', 'GB', 'TB', 'PB', 'EB', 'ZB', 'YB'] :
+      ['k', 'M', 'G', 'T', 'P', 'E', 'Z', 'Y'] :
       ['KiB', 'MiB', 'GiB', 'TiB', 'PiB', 'EiB', 'ZiB', 'YiB'];
     let u = -1;
     const r = 10 ** dp;
@@ -105,7 +105,10 @@ class SGet extends MyGet {
       ++u;
     } while (Math.round(Math.abs(bytes) * r) / r >= thresh && u < units.length - 1);
 
-    return bytes.toFixed(dp) + ' ' + units[u];
+    if (u<2) {
+      dp = 0; // don't show decimal places for kB and MB
+    }
+    return bytes.toFixed(dp) + '' + units[u];
   }
   headers(segment, position, request, response) {
     if (position === 0) {

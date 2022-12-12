@@ -8,9 +8,9 @@ const open = async (tab, extra = []) => {
 
   chrome.storage.local.get({
     width: 800,
-    height: 300, // for Windows we need this
+    height: 250, // for Windows we need this
     left: win.left + Math.round((win.width - 800) / 2),
-    top: win.top + Math.round((win.height - 300) / 2)
+    top: win.top + Math.round((win.height - 250) / 2)
   }, prefs => {
     const args = new URLSearchParams();
     args.set('tabId', tab.id);
@@ -72,6 +72,7 @@ const badge = (n, tabId) => {
 
 const observe = d => {
   // hard-coded exception list
+  // TODO allow only https://sbembed.com/* and https://delivery*.akamai-cdn-content.com/*
   if (BLOCKED_LIST.some(s => d.url.indexOf(s) !== -1 && d.url.split(s)[0].split('/').length === 3)) {
     return console.warn('This request is not being processed');
   }
