@@ -235,7 +235,11 @@ const download = async (segments, file) => {
 
   // instead of breaking, let the user retry
   n.options['error-handler'] = (e, source) => {
-    return self.prompt(`Connection to the server is broken (${source} -> ${e.message})!
+    setTimeout(() => {
+      document.querySelector('#prompt>form button[type=submit]').click();
+    }, 60000);
+    return self.prompt(`Connection to the server is broken
+(${source} -> ${e.message})!
 
 Press "Retry" to try one more time`);
   };
