@@ -75,9 +75,9 @@ class SGet extends MyGet {
 
       meta.name = e ? e[1] : fe;
 
-      // this one requires Tampermonkey script to set filename as title:
+      // !!! this one requires Tampermonkey script to set filename as title:
       // document.title = document.querySelector('h2>span').textContent;
-      if (window.page.innerText.includes('sbembed.com') || window.page.innerText.includes('streamhub.to') ) {
+      if (window.page.innerText.includes('sbembed.com') || window.page.innerText.includes('streamhub.to') || window.page.innerText.includes('vtube.to') || window.page.innerText.includes('filemoon.sx') || window.page.innerText.includes('wolfstream.tv') || window.page.innerText.includes('filelions.to') || window.page.innerText.includes('streamvid.net') ) {
         meta.name = window.title.innerText;
       }
 
