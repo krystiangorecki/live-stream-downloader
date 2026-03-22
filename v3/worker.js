@@ -30,6 +30,17 @@ const open = async (tab, extra = []) => {
     });
   });
 };
+
+chrome.commands.onCommand.addListener(async (command) => {
+  if (command === "open-extension") {
+    const [tab] = await chrome.tabs.query({
+      active: true,
+      currentWindow: true
+    });
+    open(tab);
+  }
+});
+
 chrome.action.onClicked.addListener(tab => open(tab));
 chrome.action.setBadgeBackgroundColor({
   color: '#666666'

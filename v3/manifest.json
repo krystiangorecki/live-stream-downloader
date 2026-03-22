@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "version": "0.3.5.113",
+  "version": "0.3.5.114",
   "name": "Live Stream Downloader",
   "description": "__MSG_description__",
   "default_locale": "en",
@@ -43,5 +43,14 @@
   },
   "action": {
     "default_title": "Download HLS Streams"
+  },
+  "commands": {
+    "open-extension": {
+      "suggested_key": {
+        "default": "Ctrl+Shift+A",
+        "mac": "Command+Shift+A"
+      },
+      "description": "otwiera okienko"
+    }
   }
 }
