@@ -86,6 +86,7 @@ class SGet extends MyGet {
         window.page.innerText.includes('wolfstream.tv') ||
         window.page.innerText.includes('filelions.to') ||
         window.page.innerText.includes('streamvid.net') ||
+        window.page.innerText.includes('slutvids.net.lv') ||
         window.page.innerText.includes('embedrise.com')) {
         meta.name = window.title.innerText;
       }
