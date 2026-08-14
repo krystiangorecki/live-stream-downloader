@@ -1,47 +1,73 @@
+/**
+    MyGet - A multi-thread downloading library
+    Copyright (C) 2014-2022 [Chandler Stimson]
+
+    This program is free software: you can redistribute it and/or modify
+    it under the terms of the Mozilla Public License as published by
+    the Mozilla Foundation, either version 2 of the License, or
+    (at your option) any later version.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    Mozilla Public License for more details.
+    You should have received a copy of the Mozilla Public License
+    along with this program.  If not, see {https://www.mozilla.org/en-US/MPL/}.
+
+    GitHub: https://github.com/chandler-stimson/live-stream-downloader/
+    Homepage: https://webextension.org/listing/hls-downloader.html
+*/
+
 /* global events */
 
-chrome.permissions.contains({
-  permissions: ['power']
-}, granted => {
-  document.getElementById('power').checked = granted;
-});
+// use the HTML Screen Wake Lock API instead of the "power" permission
+const powerContainer = document.getElementById('power-container');
+const power = document.getElementById('power');
 
-document.getElementById('power').addEventListener('change', e => {
-  if (e.target.checked) {
-    chrome.permissions.request({
-      permissions: ['power']
-    }, granted => {
-      if (granted) {
-        self.notify('Done, Reopen this window to apply', 2000);
-      }
-      else {
-        e.target.checked = false;
-      }
-    });
-  }
-  else {
-    chrome.permissions.remove({
-      permissions: ['power']
-    });
-    self.notify('Done, Reopen this window to apply', 2000);
-  }
-});
+let wakeLock = null;
 
-events.before.push(() => {
-  if (chrome.power) {
-    chrome.power.requestKeepAwake('display');
+const request = async () => {
+  try {
+    wakeLock = await navigator.wakeLock.request('screen');
+    console.log(wakeLock);
+  }
+  catch (e) {
+    console.warn('Keep Awake is not available', e);
+  }
+};
+const release = () => {
+  if (wakeLock) {
+    wakeLock.release().catch(() => {});
+    wakeLock = null;
+  }
+};
+
+chrome.storage.local.get({
+  'power': true
+}, prefs => {
+  power.checked = prefs.power;
+  if (!('wakeLock' in navigator)) {
+    powerContainer.classList.add('disabled');
   }
 });
-events.after.push(() => chrome.runtime.sendMessage({
-  method: 'release-awake-if-possible'
-}, () => chrome.runtime.lastError));
 
-window.addEventListener('beforeunload', () => chrome.runtime.sendMessage({
-  method: 'release-awake-if-possible'
-}, () => chrome.runtime.lastError));
+power.addEventListener('change', e => {
+  chrome.storage.local.set({
+    'power': e.target.checked
+  });
+});
 
-chrome.runtime.onMessage.addListener((request, sender, response) => {
-  if (request.method === 'any-active' && document.body.dataset.mode === 'download') {
-    response(true);
+events.before.add(() => {
+  if (power.checked) {
+    request();
   }
 });
+events.after.add(release);
+
+// the wake lock is released when the tab is hidden; re-acquire it on return
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && power.checked && document.body.dataset.mode === 'download') {
+    request();
+  }
+});
+
+addEventListener('beforeunload', release);

@@ -76,7 +76,6 @@ const open = async (tab, extra = []) => {
 
 chrome.commands.onCommand.addListener(async (command) => {
   if (command === "open-extension") {
-    // trzeba ustawić w chrome://extensions/shortcuts
     const [tab] = await chrome.tabs.query({
       active: true,
       currentWindow: true
@@ -84,7 +83,6 @@ chrome.commands.onCommand.addListener(async (command) => {
     open(tab);
   }
 });
-
 chrome.action.onClicked.addListener(tab => open(tab));
 chrome.action.setBadgeBackgroundColor({
   color: '#666666'

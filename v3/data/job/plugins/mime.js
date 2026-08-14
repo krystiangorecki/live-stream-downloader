@@ -17,9 +17,14 @@
     Homepage: https://webextension.org/listing/hls-downloader.html
 */
 
-// links
-for (const a of [...document.querySelectorAll('[data-href]')]) {
-  if (a.hasAttribute('href') === false) {
-    a.href = chrome.runtime.getManifest().homepage_url + '#' + a.dataset.href;
-  }
-}
+chrome.storage.local.get({
+  'mime-watch': false
+}).then(prefs => {
+  document.getElementById('mime-watch').checked = prefs['mime-watch'];
+
+  document.getElementById('mime-watch').onchange = e => {
+    chrome.storage.local.set({
+      'mime-watch': e.target.checked
+    });
+  };
+});

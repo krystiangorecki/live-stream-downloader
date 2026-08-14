@@ -14,7 +14,7 @@
     along with this program.  If not, see {https://www.mozilla.org/en-US/MPL/}.
 
     GitHub: https://github.com/chandler-stimson/live-stream-downloader/
-    Homepage: https://add0n.com/hls-downloader.html
+    Homepage: https://webextension.org/listing/hls-downloader.html
 */
 
 /* global MyGet */
@@ -29,6 +29,7 @@ class DGet extends MyGet {
     super(...args);
 
     this['basic-cache'] = {};
+    this['decrypted-offset'] = 0;
   }
   static merge(array) {
     // make sure to remove possible duplicated chunks (in case of error, the same chunk if fetched one more time)
@@ -69,33 +70,13 @@ class DGet extends MyGet {
   async flush(segment, position) {
     if (segment.key) {
       const {href} = new URL(segment.key.uri, segment.base || segment.uri);
-      let r;
-
-      // try to get the key multiple times
-      for (let n = 0; ; n += 1) {
-        try {
-          r = await this.native(href, {
-            'credentials': 'include'
-          }, true);
-          if (r.ok) {
-            break;
-          }
-        }
-        catch (e) {
-          console.log('key is broken', e.message);
-          if (this.controller.signal.aborted) {
-            throw e;
-          }
-          if (n > 10) {
-            if (this.options['error-handler']) {
-              await this.options['error-handler'](e, 'BROKEN_KEY');
-            }
-            else {
-              throw e;
-            }
-          }
-          await new Promise(resolve => setTimeout(resolve, 500));
-        }
+      const r = await this.native(href, {
+        'credentials': 'include'
+      }, {
+        save: true
+      });
+      if (!r.ok) {
+        throw Error('BROKEN_KEY_STATUS_' + r.status);
       }
 
       const value = await r.arrayBuffer();
@@ -105,18 +86,41 @@ class DGet extends MyGet {
       delete this['basic-cache'][position];
       const encrypted = await (new Blob(chunks)).arrayBuffer();
 
+      // const iv = segment.key?.iv?.buffer || new ArrayBuffer(16);
+
+      let iv;
+      if (segment.key?.iv) {
+        iv = segment.key?.iv?.buffer;
+      }
+      // since the manifest does not provide an IV,
+      // HLS.js will automatically generate one based on the segment sequence number
+      else {
+        const e = new Uint8Array(16);
+        for (let r = 12; r < 16; r++) {
+          e[r] = (position + 1) >> 8 * (15 - r) & 255;
+        }
+        iv = e.buffer;
+      }
+
       const decrypted = await crypto.subtle.importKey('raw', value, {
         name: 'AES-CBC',
         length: 128
-      }, false, ['decrypt']).then(importedKey => crypto.subtle.decrypt({
-        name: 'AES-CBC',
-        iv: new ArrayBuffer(16)
-      }, importedKey, encrypted));
+      }, false, ['decrypt']).then(importedKey => {
+        return crypto.subtle.decrypt({
+          name: 'AES-CBC',
+          iv
+        }, importedKey, encrypted);
+      });
+      // console.info('position mismatch', offsets[0], this['decrypted-offset']);
 
       // write to the original cache
-      const stream = new self.MemoryWriter(position, offsets[0], this.cache);
+      const stream = new self.MemoryWriter(position, offsets[0] + this['decrypted-offset'], this.cache);
       const writable = await stream.getWriter();
+
       await writable.write(new Uint8Array(decrypted));
+
+      // since we write each segment sequentially, we can fix the write position mismatch here
+      this['decrypted-offset'] += (decrypted.byteLength - encrypted.byteLength);
     }
     else {
       return;

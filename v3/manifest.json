@@ -1,6 +1,6 @@
 {
   "manifest_version": 3,
-  "version": "0.3.5.114",
+  "version": "0.5.8.202608",
   "name": "Live Stream Downloader",
   "description": "__MSG_description__",
   "default_locale": "en",
@@ -8,28 +8,26 @@
     "storage",
     "contextMenus",
     "webRequest",
-    "declarativeNetRequest"
+    "declarativeNetRequestWithHostAccess",
+    "declarativeContent",
+    "scripting",
+    "alarms"
   ],
-  "optional_permissions": [
-    "power"
-  ],
+
   "host_permissions": [
-    "*://*/*.flv*",
-    "*://*/*.avi*",
-    "*://*/*.wmv*",
-    "*://*/*.mov*",
-    "*://*/*.mp4*",
-    "*://*/*.pcm*",
-    "*://*/*.wav*",
-    "*://*/*.mp3*",
-    "*://*/*.aac*",
-    "*://*/*.ogg*",
-    "*://*/*.wma*",
-    "*://*/*.m3u8*"
+    "*://*/*"
   ],
-  "homepage_url": "https://add0n.com/hls-downloader.html",
+  "homepage_url": "https://webextension.org/listing/hls-downloader.html",
   "background": {
-    "service_worker": "worker.js"
+    "service_worker": "worker.js",
+    "scripts": [
+      "network/core.js",
+      "network/icon.js",
+      "context.js",
+      "plugins/blob-detector/core.js",
+      "data/job/extract.js",
+      "worker.js"
+    ]
   },
   "icons": {
     "16": "data/icons/16.png",
@@ -43,6 +41,15 @@
   },
   "action": {
     "default_title": "Download HLS Streams"
+  },
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "{2ea2bfef-af69-4427-909c-34e1f3f5a418}",
+      "strict_min_version": "148.0",
+      "data_collection_permissions": {
+        "required": ["none"]
+      }
+    }
   },
   "commands": {
     "open-extension": {

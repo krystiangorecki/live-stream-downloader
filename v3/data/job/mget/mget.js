@@ -14,13 +14,12 @@
     along with this program.  If not, see {https://www.mozilla.org/en-US/MPL/}.
 
     GitHub: https://github.com/chandler-stimson/live-stream-downloader/
-    Homepage: https://add0n.com/hls-downloader.html
+    Homepage: https://webextension.org/listing/hls-downloader.html
 */
 
 /* transfer the stream only when conditions met */
-class PolicyStream extends window.TransformStream {
-  constructor(size) {
-    let fetched = 0;
+class PolicyStream extends TransformStream {
+  constructor(size, fetched = 0) {
     super({
       async transform(chunk, controller) {
         fetched += chunk.byteLength;
@@ -38,11 +37,13 @@ class PolicyStream extends window.TransformStream {
 }
 
 /* use this to get fetch stats */
-class StatsStream extends window.TransformStream {
+class StatsStream extends TransformStream {
   constructor(c = () => {}) {
+    let offset = 0;
     super({
       transform(chunk, controller) {
-        c(chunk.byteLength);
+        c(chunk, offset);
+        offset += chunk.byteLength;
         return controller.enqueue(chunk);
       }
     });
@@ -80,6 +81,9 @@ class MGet {
     this.actives = 0;
     this.sizes = new Map(); // track segment offsets
     this.cache = {}; // store chunks of each segment in an array
+    this.meta = { // name, ext, mime
+      'written-size': 0
+    };
   }
   /* get called before a segment is started */
   prepare(segment, position) {
@@ -94,7 +98,9 @@ class MGet {
     return Promise.resolve();
   }
   /* get called when a new chunk is written */
-  monitor(segment, position, size) {
+  monitor(segment, position, chunk, offset) {
+    // console.info(segment.range.start + offset);
+    this.meta['written-size'] += chunk.byteLength;
   }
   /* get called when all segments are fetched */
   fetch(segments, params = {}) {
@@ -112,24 +118,37 @@ class MGet {
           position += 1;
 
           if (segment) {
-            try {
-              const p = position - 1;
-              await this.prepare(segment, p);
-              await this.pipe(segment, params, p, () => {
-                // start a new segment if we have a free thread and there are leftover segments
-                if (this.number() && segments.length) {
-                  start();
+            const p = position - 1;
+            let retryCount = 10;
+            while (retryCount > 0) {
+              try {
+                let sm = { ...segment };
+                await this.prepare(sm, p);
+                await this.pipe(sm, params, p, () => {
+                  // start a new segment if we have a free thread and there are leftover segments
+                  if (this.number() && segments.length) {
+                    start();
+                  }
+                });
+                await this.flush(sm, p);
+                break;
+              }
+              catch (e) {
+                if (e?.message === 'PIPE_SIZE_MISMATCH') {
+                  console.error(e.message, 'at position:', position, '. Download it again!', retryCount, 'retries left');
+                  retryCount -= 1;
                 }
-              });
-              await this.flush(segment, p);
-              start();
+                if (retryCount === 0) {
+                  reject(e);
+                  break;
+                }
+              }
             }
-            catch (e) {
-              reject(e);
-            }
+            start();
           }
           else {
             if (this.actives === 0) {
+              this.meta.done = true;
               resolve();
             }
           }
@@ -139,8 +158,8 @@ class MGet {
       start();
     }).catch(e => {
       console.warn(e);
-      this.controller.abort();
-      throw Error(e);
+      this.controller.abort(Error(e?.message || 'Unknown Error'));
+      throw e;
     });
   }
   /* returns total number of permitted new network connections */
@@ -168,8 +187,9 @@ class MGet {
     return stream;
   }
   /* returns the native fetch */
-  native(request, params, save = false) {
-    return fetch(request, params);
+  async native(request, params, extra = {}) { // extra.save, extra.segment
+    const r = await fetch(request, params);
+    return r;
   }
   /*
     returns a valid link with arguments from a segment
@@ -179,6 +199,12 @@ class MGet {
     } -> http://example.com/a.mp4?expires=1212
   */
   link(segment) {
+    // appending base arguments causes issue. see:
+    // https://github.com/chandler-stimson/live-stream-downloader/issues/144
+    if (segment.resolvedUri) {
+      const {href} = new URL((segment.resolvedUri || segment.uri), segment.base || undefined);
+      return href;
+    }
     const {href, search} = new URL(segment.uri, segment.base || undefined);
     if (search === '') {
       try {
@@ -198,7 +224,6 @@ class MGet {
   */
   pipe(segment, params, position = 0, settled = () => {}) {
     const href = this.link(segment);
-    // console.log(href);
 
     const request = new Request(href, {
       method: segment.method || 'GET'
@@ -206,21 +231,60 @@ class MGet {
     if (segment.range) {
       request.headers.append('Range', `bytes=${segment.range.start}-${segment.range.end}`);
     }
+    else {
+      // some servers perform better with ranged requests (some return less bytes, so we cannot use this)
+      // request.headers.append('Range', `bytes=0-`);
+    }
 
     this.actives += 1;
+    const extra = {
+      save: segment.cache,
+      segment
+    };
     return this.native(request, {
       ...params,
       signal: this.controller.signal,
       credentials: 'include'
-    }, segment.cache).then(r => {
-      const s = Number(r.headers.get('Content-Length'));
-      const size = isNaN(s) ? 0 : Number(s);
+    }, extra).then(r => {
+      const sizes = [];
+      if (r.headers.has('Content-Length')) {
+        sizes.push(r.headers.get('Content-Length'));
+      }
+      // the server might only return Content-Range or the size returned by content size is limited to a segment
+      if (r.headers.has('Content-Range')) {
+        const [ss, se, sr] = r.headers.get('Content-Range').replace('bytes ', '').split(/[-/]/);
+
+        // server
+        if (ss === '0' && se) {
+          sizes.push(sr);
+          const v = Number(se) - Number(ss) + 1;
+          if (this.options['thread-size'] > v) {
+            this.options['thread-size'] = v;
+            console.info('LOWERING_THREAD_SIZE', v);
+          }
+        }
+        else if (ss && se) {
+          sizes.push((Number(se) - Number(ss) + 1));
+        }
+        else {
+          sizes.push(sr);
+        }
+      }
+      const encoding = r.headers.get('Content-Encoding');
+
+
+      // Size is the maximum of whatever is returned by 'Content-Length' and 'Content-Range'
+      // for gzip, to prevent PIPE_SIZE_MISMATCH;
+      const ss = sizes.map(Number).filter(s => !isNaN(s));
+      const s = ss.length ? Math.max(...ss) : '';
+      const size = isNaN(s) || encoding === 'gzip' ? 0 : Number(s);
 
       if (r.ok && this.sizes.has(position) === false) {
-        this.sizes.set(position, size);
+        if (size) { // only save size if there is a header for it
+          this.sizes.set(position, size);
+        }
         this.headers(segment, position, request, r);
       }
-
       const writable = this.writer(segment, position);
 
       const type = r.headers.get('Accept-Ranges');
@@ -231,8 +295,13 @@ class MGet {
       }
       else if (r.ok) {
         // server supports range
+        const rangable = size && (
+          (type === 'bytes' && computable !== 'false') || r.status === 206
+        );
 
-        if (size && type === 'bytes' && computable !== 'false' && size > this.options['thread-size']) {
+        if (rangable && size > this.options['thread-size']) {
+          segment.extraThreads = segment.extraThreads || new Set();
+
           return new Promise((resolve, reject) => {
             let start = segment.range?.start || 0;
             const end = segment.range?.end || size - 1;
@@ -249,55 +318,78 @@ class MGet {
               }
             }
 
-            // start the first part
-            let actives = 1;
+            // start the first part -> .pipeThrough(timeout)
             const policy = new PolicyStream(this.options['thread-size']);
-            const monitor = new StatsStream(size => {
-              this.monitor(segment, position, size);
+            segment.range = { // this is useful for error recovery
+              start: 0,
+              end: this.options['thread-size'],
+              complex: true
+            };
+            const monitor = new StatsStream((chunk, offset) => {
+              this.monitor(segment, position, chunk, offset);
             });
-            r.body.pipeThrough(policy).pipeThrough(monitor).pipeTo(writable).then(() => {
-              actives -= 1;
-              this.actives -= 1;
-              more();
-            }).catch(reject);
+
+            const oResponse = r.body.pipeThrough(policy).pipeThrough(monitor).pipeTo(writable)
+              .then(() => {
+                this.actives -= 1;
+                more();
+              }, e => {
+                reject(e);
+                more();
+              });
             // start other parts
             const more = () => {
               const ns = this.number();
               for (let n = 0; n < ns; n += 1) {
                 const start = ranges.shift();
                 if (start) {
-                  actives += 1;
-                  this.pipe({ // do not pass the "settled" method to the subsequent pipes
+                  const exResponse = this.pipe({ // do not pass the "settled" method to the subsequent pipes
                     ...segment,
                     range: {
                       start,
                       end: Math.min(start + this.options['thread-size'] - 1, end)
                     }
                   }, params, position).then(() => {
-                    actives -= 1;
+                    segment.extraThreads.delete(exResponse);
                     more();
-                  }).catch(reject);
+                  }).catch(e => {
+                    segment.extraThreads.delete(exResponse);
+                    reject(e);
+                  });
+                  segment.extraThreads.add(exResponse);
                 }
                 else {
                   break;
                 }
               }
-              if (actives === 0 && ranges.length === 0) {
-                resolve();
+              if (ranges.length === 0 && segment.extraThreads.size === 0) {
+                oResponse.finally(() => resolve());
               }
               settled();
               settled = () => {};
             };
-
             more();
           });
         }
         else {
           settled();
-          const monitor = new StatsStream(size => {
-            this.monitor(segment, position, size);
+          // if server does not return the segment size
+          let s = 0;
+          const monitor = new StatsStream((chunk, offset) => {
+            s += chunk.byteLength;
+
+            this.monitor(segment, position, chunk, offset);
           });
+
           return r.body.pipeThrough(monitor).pipeTo(writable).then(() => {
+            if (this.sizes.has(position) === false) { // save the extracted size for later use
+              console.info('SET_SIZE', position, s);
+              this.sizes.set(position, s);
+            }
+            else if (s !== size) {
+              console.error('PIPE_SIZE_MISMATCH', s, size, segment.range, r);
+              throw Error('PIPE_SIZE_MISMATCH');
+            }
             this.actives -= 1;
           });
         }
@@ -313,8 +405,14 @@ class MGet {
 }
 MGet.OPTIONS = {
   'thread-size': 3 * 1024 * 1024, // bytes; size of each segment (do not increase unless check with a large file)
+  // thread-timeout: ms for inactivity period before breaking. Do not use small value since it is also used for
+  // downloading from server that does not support ranging
+  'thread-timeout': 10000, // ms
+  'thread-initial-timeout': 10000, // ms
+  'error-tolerance': 30, // number of times a single uri can throw error before breaking
+  'error-delay': 300, // ms; min-delay before restarting the segment
   'threads': 2, // number; max number of simultaneous threads
-  'next-segment-wait': 2000 // ms; time to wait after a segment is started, before considering the next segment
+  'next-segment-wait': 2000 // ms; time to wait after a segment is started, before considering the next segment,
 };
 
 self.MyGet = MGet;

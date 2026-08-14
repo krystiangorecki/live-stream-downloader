@@ -14,7 +14,7 @@
     along with this program.  If not, see {https://www.mozilla.org/en-US/MPL/}.
 
     GitHub: https://github.com/chandler-stimson/live-stream-downloader/
-    Homepage: https://add0n.com/hls-downloader.html
+    Homepage: https://webextension.org/listing/hls-downloader.html
 */
 
 /* global MyGet */
@@ -29,7 +29,7 @@ class CGet extends MyGet {
 
     this['cache-id'] = 'myget-cache-' + Math.random();
   }
-  async native(request, params, save = false) {
+  async native(request, params, extra) {
     const cache = await caches.open(this['cache-id']);
     let response = await cache.match(request);
 
@@ -37,8 +37,8 @@ class CGet extends MyGet {
       return response;
     }
     else {
-      response = await super.native(request, params, save);
-      if (save) {
+      response = await super.native(request, params, extra);
+      if (extra.save) {
         await cache.put(request, response.clone());
       }
 
@@ -47,14 +47,15 @@ class CGet extends MyGet {
   }
   // clean the cache
   fetch(...args) {
-    return super.fetch(...args).then(r => {
+    const o = super.fetch(...args);
+
+    return o.then(r => {
       caches.delete(this['cache-id']);
 
       return r;
     }).catch(e => {
       caches.delete(this['cache-id']);
-
-      throw Error(e);
+      throw e;
     });
   }
 }

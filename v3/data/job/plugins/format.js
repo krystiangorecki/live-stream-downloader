@@ -17,9 +17,12 @@
     Homepage: https://webextension.org/listing/hls-downloader.html
 */
 
-// links
-for (const a of [...document.querySelectorAll('[data-href]')]) {
-  if (a.hasAttribute('href') === false) {
-    a.href = chrome.runtime.getManifest().homepage_url + '#' + a.dataset.href;
-  }
-}
+chrome.storage.local.get({
+  'default-format': 'mkv'
+}).then(prefs => {
+  document.getElementById('default-format').value = prefs['default-format'];
+});
+
+document.getElementById('default-format').onchange = e => chrome.storage.local.set({
+  'default-format': e.target.value
+});

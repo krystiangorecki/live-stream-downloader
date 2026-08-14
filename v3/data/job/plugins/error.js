@@ -17,9 +17,19 @@
     Homepage: https://webextension.org/listing/hls-downloader.html
 */
 
-// links
-for (const a of [...document.querySelectorAll('[data-href]')]) {
-  if (a.hasAttribute('href') === false) {
-    a.href = chrome.runtime.getManifest().homepage_url + '#' + a.dataset.href;
-  }
-}
+/* global MyGet */
+
+chrome.storage.local.get({
+  'error-tolerance': MyGet.OPTIONS['error-tolerance']
+}).then(prefs => {
+  document.getElementById('error-tolerance').value = prefs['error-tolerance'];
+
+  document.getElementById('error-tolerance').onchange = e => {
+    const n = Math.max(1, Math.min(100, e.target.valueAsNumber));
+    if (isNaN(n) === false) {
+      chrome.storage.local.set({
+        'error-tolerance': n
+      });
+    }
+  };
+});

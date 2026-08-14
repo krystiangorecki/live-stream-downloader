@@ -4,13 +4,13 @@
   --fg-green: #32715a;
   --bg-light-dark: rgba(0, 0, 0, 0.05);
   --bg-dark: #4d5155;
-  --bg-light: #002e0a;
+  --bg-light: #fff;
   --bg-progress: #0074cc;
   --bg-progress-alt: #fff;
   --bg-progress-body: #ffffff0d;
   --disabled: 0.5;
 }
-/*#1a2a13*/
+/*#1a2a13/
 body {
   font-size: 13px;
   font-family: Arial, "Helvetica Neue", Helvetica, sans-serif;
